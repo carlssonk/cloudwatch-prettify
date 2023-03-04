@@ -1,0 +1,17 @@
+.awsui-table-row:not(:first-child):not(:last-child) {
+  display: none !important;
+}
+
+.awsui-table-nowrap {
+  position: relative !important;
+
+}
+
+.awsui-table-sticky-active {
+  display: none !important;
+}
+
+tbody {
+  display: flex;
+  flex-direction: column;
+}
