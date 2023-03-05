@@ -65,7 +65,9 @@ export const getStyle: PlasmoGetStyle = () => {
 }
 
 export const config: PlasmoCSConfig = {
-  matches: ["https://eu-north-1.console.aws.amazon.com/cloudwatch/*"],
+  matches: [
+    "https://eu-north-1.console.aws.amazon.com/*",
+  ],
 }
 
 function PlasmoMainUI() {
@@ -98,9 +100,9 @@ function PlasmoMainUI() {
 
           
           const messageSplitIndexAt = message?.indexOf('-') + 1
-          if (messageSplitIndexAt < 0) return null
-
-          const log = JSON.parse(message.slice(messageSplitIndexAt).trim())
+   
+          const jsonStringFromMessage = message[0] === "{" ? message : message.slice(messageSplitIndexAt).trim()
+          const log = JSON.parse(jsonStringFromMessage)
 
           if (log.meta?.username && !createUsernameColors[log.meta.username]) {
             createUsernameColors[log.meta.username] = stringToHex(log.meta.username)
@@ -114,6 +116,11 @@ function PlasmoMainUI() {
           }
         }).filter(x => x)
 
+        if (createLogs[0]?.meta?.service !== 'app-driver') return
+
+        // Override css
+        getRowContainer().insertAdjacentHTML('beforebegin', `<style>${overrideCss}</style>`)
+
         setLogs(createLogs)
         setUsernameColors(createUsernameColors)
     }
@@ -125,8 +132,6 @@ function PlasmoMainUI() {
 
   useEffect(() => {
     const init = async () => {
-      getRowContainer().insertAdjacentHTML('beforebegin', `<style>${overrideCss}</style>`)
-
       setHasInited(true)
 
       scrapeLogs()
@@ -167,7 +172,7 @@ function PlasmoMainUI() {
           logs && logs.map(({msg, friendlyTime, level, data, meta, timestamp, id, showMeta}) => {
             return (
               <li key={id} className="log-item">
-                <div className="min-h-12 w-full flex flex-col p-1" style={{ backgroundColor: msg.includes('[WARNING]') ? '#f5c1c1' : ''}}>
+                <div className="min-h-12 w-full flex flex-col p-1" style={{ backgroundColor: msg?.includes('[WARNING]') ? '#f5c1c1' : ''}}>
                   <div className="cursor-pointer" onClick={() => handleToggleMeta(id)}>
                     <div className="h-10 flex items-center w-full">
                       <div className={`mr-1 w-[20px] min-w-[20px] level-${level}`}>{levelIcon(level)}</div>
