@@ -1,3 +1,5 @@
+import type { PlasmoCSUIAnchor } from "plasmo"
+
 const selector = {
   iframe: '#microConsole-Logs',
   rowContainer: 'div.awsui-table-container > table > tbody',
@@ -32,4 +34,15 @@ const stringToHex = (str: string) => {
   return color;
 }
 
-export { selector, getRowContainer, formatTwoDigits, stringToHex }
+const waitForAnchor = (): Promise<PlasmoCSUIAnchor> =>
+  new Promise((resolve) => {
+    const checkInterval = setInterval(() => {
+      const rootContainer = getRowContainer()?.querySelector('.awsui-table-row')
+      if (rootContainer) {
+        clearInterval(checkInterval)
+        resolve({element: rootContainer, type: 'inline'})
+      }
+    }, 100)
+  })
+
+export { selector, getRowContainer, formatTwoDigits, stringToHex, waitForAnchor }

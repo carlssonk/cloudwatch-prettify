@@ -1,8 +1,8 @@
-import type { PlasmoCSConfig, PlasmoGetInlineAnchor, PlasmoGetStyle } from "plasmo"
+import type { PlasmoCSConfig, PlasmoGetStyle } from "plasmo"
 import { useCallback, useEffect, useState } from "react"
 import overrideCss from "data-text:../override.css"
 import mainCss from "data-text:../main.css"
-import { formatTwoDigits, getRowContainer, selector, stringToHex } from "./utils"
+import { formatTwoDigits, getRowContainer, selector, stringToHex, waitForAnchor } from "./utils"
 import { v4 as uuidv4 } from 'uuid';
 import InfoIcon from "react:~/assets/info-lg.svg"
 import WarnIcon from "react:~/assets/exclamation-triangle-fill.svg"
@@ -10,7 +10,9 @@ import ErrorIcon from "react:~/assets/x-circle-fill.svg"
 import CaretLeft from "react:~/assets/caret-left-fill.svg"
 import CaretDown from "react:~/assets/caret-down-fill.svg"
 import JSONPretty from 'react-json-pretty';
-import { useMutationObservable } from "./useMutationObservable"
+import _ from "lodash";
+import type { PlasmoRender } from "plasmo"
+import { createRoot } from "react-dom/client"
 
 
 type Loglevels = 'info' | 'warn' | 'error'
@@ -38,7 +40,23 @@ type Log = {
   timestamp: string // iso
 }
 
-// export = needed for plasmo to process
+export const render: PlasmoRender = async (
+  {
+    createRootContainer // This creates the default root container
+  },
+  InlineCSUIContainer,
+) => {
+  const anchor = await waitForAnchor();
+  const rootContainer = await createRootContainer(anchor)
+
+  const root = createRoot(rootContainer) // Any root
+  root.render(
+    // @ts-ignore
+    <InlineCSUIContainer>
+      <PlasmoMainUI />
+    </InlineCSUIContainer>
+  )
+}
 
 export const getStyle: PlasmoGetStyle = () => {
   const style = document.createElement("style")
@@ -50,22 +68,10 @@ export const config: PlasmoCSConfig = {
   matches: ["https://eu-north-1.console.aws.amazon.com/cloudwatch/*"],
 }
 
-export const getInlineAnchor: PlasmoGetInlineAnchor = () =>
-  new Promise((resolve) => {
-    const checkInterval = setInterval(() => {
-      const rootContainer = getRowContainer()?.querySelector('.awsui-table-row')
-      if (rootContainer) {
-        clearInterval(checkInterval)
-        resolve(rootContainer)
-      }
-    }, 100)
-  })
-
-export default function PlasmoMainUI() {
+function PlasmoMainUI() {
   const [logs, setLogs] = useState<Log[] | null>(null)
   const [hasInited, setHasInited] = useState(false)
   const [usernameColors, setUsernameColors] = useState({})
-
 
   const scrapeLogs = useCallback(() => {
 
@@ -156,7 +162,6 @@ export default function PlasmoMainUI() {
   }
 
   return (
-    <div className="flex flex-col">
       <ul className="w-full text-2xl text-gray-700 font-mono">
         {
           logs && logs.map(({msg, friendlyTime, level, data, meta, timestamp, id, showMeta}) => {
@@ -187,7 +192,55 @@ export default function PlasmoMainUI() {
           })
         }
       </ul>
-    </div>
-
     )
+}
+
+const MUTATION_OBSERVABLE_OPTIONS = {
+  config: { attributes: false, childList: true, subtree: false },
+  debounceTime: 0
+};
+
+function useMutationObservable(targetEl, cb, options = MUTATION_OBSERVABLE_OPTIONS) {
+  const [observer, setObserver] = useState(null);
+
+  const { debounceTime } = options;
+  const debouncedCallback = _.debounce(cb, debounceTime)
+
+  useEffect(() => {
+    if (!cb || typeof cb !== "function") {
+      console.warn(
+        `You must provide a valida callback function, instead you've provided ${cb}`
+      );
+      return;
+    }
+    
+    const obs = new MutationObserver(
+      debounceTime > 0 ? debouncedCallback : cb
+    );
+    setObserver(obs);
+  }, [cb, setObserver]);
+
+  useEffect(() => {
+    if (!observer) return;
+
+    if (!targetEl) {
+      console.warn(
+        `You must provide a valid DOM element to observe, instead you've provided ${targetEl}`
+      );
+    }
+
+    const { config } = options;
+
+    try {
+      observer.observe(targetEl, config);
+    } catch (e) {
+      // console.warn(e);
+    }
+
+    return () => {
+      if (observer) {
+        observer.disconnect();
+      }
+    };
+  }, [observer, targetEl, options]);
 }

@@ -15,3 +15,7 @@ tbody {
   display: flex;
   flex-direction: column;
 }
+
+plasmo-csui {
+  z-index: 1;
+}

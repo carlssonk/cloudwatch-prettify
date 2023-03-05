@@ -1,8 +1,8 @@
 {
   "name": "cloudwatch-prettify",
-  "displayName": "Cloudwatch prettify",
+  "displayName": "CloudWatch Prettify",
   "version": "0.0.1",
-  "description": "A basic Plasmo extension.",
+  "description": "'Syntactic sugar' for CloudWatch logs",
   "author": "oliver",
   "packageManager": "yarn@1.22.19",
   "scripts": {
