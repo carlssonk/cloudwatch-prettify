@@ -185,7 +185,7 @@ function PlasmoMainUI() {
                 </div>
                 <div style={{ display: showMeta ? 'block' : 'none' }} className="text-xl p-4 font-medium relative">
                   <div className="absolute top-2 right-2">metadata</div>
-                  <JSONPretty id="json-pretty" mainStyle="color: #1f2937" stringStyle="color: #0d7d70" keyStyle="color: #1f2937" booleanStyle="color: #c812c0" valueStyle="color: #005aff;" data={{...meta, timestamp}}></JSONPretty>
+                  <JSONPretty id="json-pretty" mainStyle="color: #1f2937" stringStyle="color: #0d7d70" keyStyle="color: #1f2937" booleanStyle="color: #c812c0" valueStyle="color: #005aff;" data={{...meta, timestamp, level}}></JSONPretty>
                 </div>
               </li>
             )
