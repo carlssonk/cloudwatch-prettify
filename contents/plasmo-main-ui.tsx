@@ -4,13 +4,13 @@ import overrideCss from "data-text:../override.css"
 import mainCss from "data-text:../main.css"
 import { formatTwoDigits, getRowContainer, selector, stringToHex } from "./utils"
 import { v4 as uuidv4 } from 'uuid';
-import _ from "lodash"
 import InfoIcon from "react:~/assets/info-lg.svg"
 import WarnIcon from "react:~/assets/exclamation-triangle-fill.svg"
 import ErrorIcon from "react:~/assets/x-circle-fill.svg"
 import CaretLeft from "react:~/assets/caret-left-fill.svg"
 import CaretDown from "react:~/assets/caret-down-fill.svg"
 import JSONPretty from 'react-json-pretty';
+import { useMutationObservable } from "./useMutationObservable"
 
 
 type Loglevels = 'info' | 'warn' | 'error'
@@ -37,21 +37,6 @@ type Log = {
   }
   timestamp: string // iso
 }
-
-
-// TEMPORARY
-function makeid(length: number) {
-  let result = '';
-  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  const charactersLength = characters.length;
-  let counter = 0;
-  while (counter < length) {
-    result += characters.charAt(Math.floor(Math.random() * charactersLength));
-    counter += 1;
-  }
-  return result;
-}
-
 
 // export = needed for plasmo to process
 
@@ -112,9 +97,6 @@ export default function PlasmoMainUI() {
           const log = JSON.parse(message.slice(messageSplitIndexAt).trim())
 
           if (log.meta?.username && !createUsernameColors[log.meta.username]) {
-            log.meta.username = makeid(Math.max(3, Math.floor(Math.random() * 30)))
-
-            
             createUsernameColors[log.meta.username] = stringToHex(log.meta.username)
           }
 
@@ -174,6 +156,7 @@ export default function PlasmoMainUI() {
   }
 
   return (
+    <div className="flex flex-col">
       <ul className="w-full text-2xl text-gray-700 font-mono">
         {
           logs && logs.map(({msg, friendlyTime, level, data, meta, timestamp, id, showMeta}) => {
@@ -204,72 +187,7 @@ export default function PlasmoMainUI() {
           })
         }
       </ul>
+    </div>
+
     )
-}
-
-
-
-// function debounce(func, wait) {
-// 	var timeout;
-// 	return function() {
-// 		var context = this, args = arguments;
-// 		var later = function() {
-// 			timeout = null;
-// 			func.apply(context, args);
-// 		};
-// 		var callNow = setImmediate && !timeout;
-// 		clearTimeout(timeout);
-// 		timeout = setTimeout(later, wait);
-// 		if (callNow) func.apply(context, args);
-// 	};
-// }
-
-const MUTATION_OBSERVABLE_OPTIONS = {
-  config: { attributes: false, childList: true, subtree: false },
-  debounceTime: 0
-};
-
-function useMutationObservable(targetEl, cb, options = MUTATION_OBSERVABLE_OPTIONS) {
-  const [observer, setObserver] = useState(null);
-
-  const { debounceTime } = options;
-  const debouncedCallback = _.debounce(cb, debounceTime)
-
-  useEffect(() => {
-    if (!cb || typeof cb !== "function") {
-      console.warn(
-        `You must provide a valida callback function, instead you've provided ${cb}`
-      );
-      return;
-    }
-    
-    const obs = new MutationObserver(
-      debounceTime > 0 ? debouncedCallback : cb
-    );
-    setObserver(obs);
-  }, [cb, options, setObserver]);
-
-  useEffect(() => {
-    if (!observer) return;
-
-    if (!targetEl) {
-      console.warn(
-        `You must provide a valid DOM element to observe, instead you've provided ${targetEl}`
-      );
-    }
-
-    const { config } = options;
-
-    try {
-      observer.observe(targetEl, config);
-    } catch (e) {
-      // console.warn(e);
-    }
-
-    return () => {
-      if (observer) {
-        observer.disconnect();
-      }
-    };
-  }, [observer, targetEl, options]);
 }
