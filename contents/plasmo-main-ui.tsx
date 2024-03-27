@@ -240,7 +240,7 @@ function PlasmoMainUI() {
       <ul className="w-full text-2xl text-gray-700 font-mono">
 
           {
-          filteredLogs.length && filteredLogs.map(item => {
+          filteredLogs.length > 0 && filteredLogs.map(item => {
             return <ListItem key={item.id} item={item} usernameColors={usernameColors} levelIcon={levelIcon} handleToggleMeta={handleToggleMeta} />
           })
         }
