@@ -2,7 +2,7 @@ import type { PlasmoCSConfig, PlasmoGetStyle } from "plasmo"
 import { useCallback, useEffect, useState } from "react"
 import overrideCss from "data-text:../override.css"
 import mainCss from "data-text:../main.css"
-import { formatTwoDigits, getRowContainer, selector, stringToHex, waitForAnchor } from "./utils"
+import { formatTwoDigits, getRowContainer, getTable, selector, stringToHex, waitForAnchor } from "./utils"
 import { v4 as uuidv4 } from 'uuid';
 import InfoIcon from "react:~/assets/info-lg.svg"
 import WarnIcon from "react:~/assets/exclamation-triangle-fill.svg"
@@ -40,12 +40,29 @@ type Log = {
   timestamp: string // iso
 }
 
-export const render: PlasmoRender = async (
-  {
-    createRootContainer // This creates the default root container
-  },
-  InlineCSUIContainer,
-) => {
+const currentPageHasLogEvents = () => {
+  const URL = window.location.href;
+  return URL.includes('log-events')
+}
+
+const listenForPageNavigation = ({createRootContainer,InlineCSUIContainer}) => {
+    let previousPageHadLogEvents = false;
+
+    setInterval(() => {
+      const pageHasLogEvents = currentPageHasLogEvents()
+      if (!previousPageHadLogEvents && pageHasLogEvents) {
+        previousPageHadLogEvents = true
+        renderLogs({createRootContainer,InlineCSUIContainer})
+      }
+
+      if (!pageHasLogEvents) {
+        previousPageHadLogEvents = false
+      }
+    }, 500);
+}
+
+
+async function renderLogs({createRootContainer,InlineCSUIContainer}) {
   const anchor = await waitForAnchor();
   const rootContainer = await createRootContainer(anchor)
 
@@ -56,6 +73,15 @@ export const render: PlasmoRender = async (
       <PlasmoMainUI />
     </InlineCSUIContainer>
   )
+}
+
+export const render: PlasmoRender = (
+  {
+    createRootContainer // This creates the default root container
+  },
+  InlineCSUIContainer,
+) => {
+  listenForPageNavigation({ createRootContainer, InlineCSUIContainer })
 }
 
 export const getStyle: PlasmoGetStyle = () => {
@@ -73,6 +99,10 @@ export const config: PlasmoCSConfig = {
 function PlasmoMainUI() {
   const [logs, setLogs] = useState<Log[] | null>(null)
   const [hasInited, setHasInited] = useState(false)
+  const [store] = useState({
+    set: new Set(),
+    prevLength: 0,
+  })
   const [usernameColors, setUsernameColors] = useState({})
 
   const scrapeLogs = useCallback(() => {
@@ -82,6 +112,12 @@ function PlasmoMainUI() {
       if (rowContainer) {
 
         const childNodesArray = [...rowContainer.childNodes]
+        // childNodesArray should always be filled with more logs
+        if (childNodesArray.length < store.prevLength) {
+          // invalidate set if length is less than current nodes
+          store.set.clear()
+        }
+        store.prevLength = childNodesArray.length
 
         // 2 = skip the Load more/Resume row and skip this ui compoonent
         // childNodesArray.length - 1 = skip the Load more/Resume row
@@ -97,12 +133,18 @@ function PlasmoMainUI() {
 
           const message = row.querySelector(selector.json)?.innerText?.trim() as string
           if (!message) return null
-
           
           const messageSplitIndexAt = message?.indexOf('-') + 1
    
           const jsonStringFromMessage = message[0] === "{" ? message : message.slice(messageSplitIndexAt).trim()
+
           const log = JSON.parse(jsonStringFromMessage)
+
+          if (store.set.has(log.id) || store.set.has(jsonStringFromMessage)) {
+            return null // Dont include duplicates
+          } else {
+            store.set.add(log.id || jsonStringFromMessage)
+          }
 
           if (log.meta?.username && !createUsernameColors[log.meta.username]) {
             createUsernameColors[log.meta.username] = stringToHex(log.meta.username)
@@ -115,13 +157,30 @@ function PlasmoMainUI() {
             ...log,
           }
         }).filter(x => x)
-
-        if (createLogs[0]?.meta?.service !== 'app-driver') return
+        if (!['app-driver', 'app-consumer'].includes(createLogs[0]?.meta?.service)) return
 
         // Override css
-        getRowContainer().insertAdjacentHTML('beforebegin', `<style>${overrideCss}</style>`)
+        getTable().insertAdjacentHTML('beforebegin', `<style>${overrideCss}</style>`)
 
-        setLogs(createLogs)
+        setLogs(prevLogs => {
+
+          const newLogsLastTime = new Date(createLogs[createLogs.length - 1].timestamp)
+          const previousLogsFirstTime = new Date(prevLogs?.[0].timestamp || 0)
+
+          if (newLogsLastTime <= previousLogsFirstTime) {
+            return [
+              ...createLogs,
+              ...(prevLogs ?? [])
+            ]
+          } else {
+            return [
+              ...(prevLogs ?? []),
+              ...createLogs
+            ]
+          }
+          
+        }
+          )
         setUsernameColors(createUsernameColors)
     }
   }, [])

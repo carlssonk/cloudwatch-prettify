@@ -1,4 +1,4 @@
-.awsui-table-row:not(:first-child):not(:last-child) {
+.awsui_row_wih1l_1efw1_314:not(:first-child):not(:last-child) {
   display: none !important;
 }
 
@@ -9,6 +9,11 @@
 
 .awsui-table-sticky-active {
   display: none !important;
+}
+
+table {
+  display: flex;
+  flex-direction: column;
 }
 
 tbody {

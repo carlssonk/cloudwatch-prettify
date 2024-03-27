@@ -1,8 +1,8 @@
 {
   "name": "cloudwatch-prettify",
   "displayName": "CloudWatch Prettify",
-  "version": "0.0.1",
-  "description": "'Syntactic sugar' for CloudWatch logs (app-driver)",
+  "version": "0.0.2",
+  "description": "'Syntactic sugar' for CloudWatch logs",
   "author": "oliver",
   "packageManager": "yarn@1.22.19",
   "scripts": {
@@ -16,7 +16,7 @@
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "react-json-pretty": "^2.2.0",
-    "uuid": "^9.0.0"
+    "uuid": "^9.0.1"
   },
   "devDependencies": {
     "@plasmohq/prettier-plugin-sort-imports": "3.6.1",
@@ -25,12 +25,12 @@
     "@types/node": "18.11.18",
     "@types/react": "18.0.27",
     "@types/react-dom": "18.0.10",
-    "@types/uuid": "^9.0.1",
-    "@typescript-eslint/eslint-plugin": "^5.54.0",
-    "@typescript-eslint/parser": "^5.54.0",
+    "@types/uuid": "^9.0.8",
+    "@typescript-eslint/eslint-plugin": "^5.62.0",
+    "@typescript-eslint/parser": "^5.62.0",
     "autoprefixer": "^10.4.13",
-    "eslint": "^8.35.0",
-    "eslint-plugin-react": "^7.32.2",
+    "eslint": "^8.57.0",
+    "eslint-plugin-react": "^7.34.1",
     "eslint-plugin-react-hooks": "^4.6.0",
     "postcss": "^8.4.21",
     "prettier": "2.8.3",
