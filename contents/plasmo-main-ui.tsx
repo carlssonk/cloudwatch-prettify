@@ -1,5 +1,5 @@
 import type { PlasmoCSConfig, PlasmoGetStyle } from "plasmo"
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useState, memo } from "react"
 import overrideCss from "data-text:../override.css"
 import mainCss from "data-text:../main.css"
 import { formatTwoDigits, getRowContainer, getTable, selector, stringToHex, waitForAnchor } from "./utils"
@@ -96,12 +96,17 @@ export const config: PlasmoCSConfig = {
   ],
 }
 
+function getLogId(node: any) {
+  const timestamp = node.querySelector(selector.json)?.innerText?.trim() as string
+  return JSON.stringify(timestamp)
+}
+
 function PlasmoMainUI() {
-  const [logs, setLogs] = useState<Log[] | null>(null)
+  const [logs, setLogs] = useState<Log[] | null>([])
   const [hasInited, setHasInited] = useState(false)
   const [store] = useState({
-    set: new Set(),
     prevLength: 0,
+    previousBatchFirstLogId: ''
   })
   const [usernameColors, setUsernameColors] = useState({})
 
@@ -110,23 +115,32 @@ function PlasmoMainUI() {
       const rowContainer = getRowContainer()
 
       if (rowContainer) {
-
         const childNodesArray = [...rowContainer.childNodes]
-        // childNodesArray should always be filled with more logs
-        if (childNodesArray.length < store.prevLength) {
-          // invalidate set if length is less than current nodes
-          store.set.clear()
-        }
-        store.prevLength = childNodesArray.length
 
         // 2 = skip the Load more/Resume row and skip this ui compoonent
         // childNodesArray.length - 1 = skip the Load more/Resume row
         const slicedChildNodesArray = childNodesArray.slice(2, childNodesArray.length - 1)
 
+        const newBatchFirstLogId = getLogId(slicedChildNodesArray[0])
+        let left = 0;
+        let right = slicedChildNodesArray.length;
+        if (store.prevLength) {
+          if (newBatchFirstLogId !== store.previousBatchFirstLogId) {
+            left = 0;
+            right = slicedChildNodesArray.length - store.prevLength
+          } else {
+            left =  store.prevLength
+            right = slicedChildNodesArray.length
+          }
+        }
 
         const createUsernameColors = {}
 
-        const createLogs = slicedChildNodesArray.map((row: any) => {
+        const newLogs = []
+
+        while (left < right) {
+          const row = slicedChildNodesArray[left] as any
+
           const timestamp = row.querySelector(selector.timestamp)?.innerText?.trim() as string
           if (!timestamp) return null
           const dateFromTimestamp = new Date(timestamp)
@@ -140,48 +154,43 @@ function PlasmoMainUI() {
 
           const log = JSON.parse(jsonStringFromMessage)
 
-          if (store.set.has(log.id) || store.set.has(jsonStringFromMessage)) {
-            return null // Dont include duplicates
-          } else {
-            store.set.add(log.id || jsonStringFromMessage)
-          }
-
           if (log.meta?.username && !createUsernameColors[log.meta.username]) {
             createUsernameColors[log.meta.username] = stringToHex(log.meta.username)
           }
 
-          return {
+          newLogs.push({
             showMeta: false,
             id: uuidv4(),
             friendlyTime: `${formatTwoDigits(dateFromTimestamp.getHours())}:${formatTwoDigits(dateFromTimestamp.getMinutes())}:${formatTwoDigits(dateFromTimestamp.getSeconds())}`,
             ...log,
-          }
-        }).filter(x => x)
-        if (!['app-driver', 'app-consumer'].includes(createLogs[0]?.meta?.service)) return
+          })
+
+          left++
+        }
+
+        if (!['app-driver', 'app-consumer'].includes(newLogs[0]?.meta?.service)) return
 
         // Override css
         getTable().insertAdjacentHTML('beforebegin', `<style>${overrideCss}</style>`)
 
+        const previousBatchFirstLogId = store.previousBatchFirstLogId
         setLogs(prevLogs => {
-
-          const newLogsLastTime = new Date(createLogs[createLogs.length - 1].timestamp)
-          const previousLogsFirstTime = new Date(prevLogs?.[0].timestamp || 0)
-
-          if (newLogsLastTime <= previousLogsFirstTime) {
+          if (newBatchFirstLogId !== previousBatchFirstLogId) {
             return [
-              ...createLogs,
+              ...newLogs,
               ...(prevLogs ?? [])
             ]
           } else {
             return [
               ...(prevLogs ?? []),
-              ...createLogs
+              ...newLogs
             ]
           }
-          
-        }
-          )
+        })
         setUsernameColors(createUsernameColors)
+
+        store.previousBatchFirstLogId = newBatchFirstLogId
+        store.prevLength = slicedChildNodesArray.length
     }
   }, [])
 
@@ -225,39 +234,50 @@ function PlasmoMainUI() {
     setLogs(updatedLogs)
   }
 
+  const filteredLogs = logs.filter(x => x)
+
   return (
       <ul className="w-full text-2xl text-gray-700 font-mono">
-        {
-          logs && logs.map(({msg, friendlyTime, level, data, meta, timestamp, id, showMeta}) => {
-            return (
-              <li key={id} className="log-item">
-                <div className="min-h-12 w-full flex flex-col p-1" style={{ backgroundColor: msg?.includes('[WARNING]') ? '#f5c1c1' : ''}}>
-                  <div className="cursor-pointer" onClick={() => handleToggleMeta(id)}>
-                    <div className="h-10 flex items-center w-full">
-                      <div className={`mr-1 w-[20px] min-w-[20px] level-${level}`}>{levelIcon(level)}</div>
-                      <div className="mr-2 text-lg font-thin min-w-[60px] w-[60px]">{friendlyTime}</div>
-                      <div className={`mr-5 min-w-[150px] text-lg text-center rounded border py-1 px-2 overflow-hidden text-ellipsis ${showMeta ? 'break-words' : 'whitespace-nowrap w-[150px]' }`} style={{ backgroundColor: meta.username ? usernameColors[meta.username] + '40' : 'rgb(222,222,222)', borderColor: meta.username ? usernameColors[meta.username] + '80' : '' }}>{meta.username || ''}</div>
-                      <div className={`text-xl font-medium text-gray-800 overflow-hidden text-ellipsis ${showMeta ? 'break-words' : 'whitespace-nowrap' }`}>{msg}</div>
-                      <div className="ml-auto caret-icon">
-                        {showMeta ? <CaretDown /> : <CaretLeft />}
-                      </div>
-                    </div>
-                    <div style={{ display: data && Object.keys(data).length > 0 ? 'block' : 'none' }} className="text-xl p-2 font-medium">
-                      <JSONPretty id="json-pretty" mainStyle="color: #1f2937" stringStyle="color: #1287c8" keyStyle="color: #1f2937" booleanStyle="color: #c812c0" valueStyle="color: #005aff;" data={data}></JSONPretty>
-                    </div>
-                  </div>
-                </div>
-                <div style={{ display: showMeta ? 'block' : 'none' }} className="text-xl p-4 font-medium relative">
-                  <div className="absolute top-2 right-2">metadata</div>
-                  <JSONPretty id="json-pretty" mainStyle="color: #1f2937" stringStyle="color: #0d7d70" keyStyle="color: #1f2937" booleanStyle="color: #c812c0" valueStyle="color: #005aff;" data={{...meta, timestamp, level}}></JSONPretty>
-                </div>
-              </li>
-            )
+
+          {
+          filteredLogs.length && filteredLogs.map(item => {
+            return <ListItem key={item.id} item={item} usernameColors={usernameColors} levelIcon={levelIcon} handleToggleMeta={handleToggleMeta} />
           })
         }
       </ul>
     )
 }
+
+const ListItem = memo(({ item, usernameColors, levelIcon, handleToggleMeta }: {item: Log, usernameColors: any, levelIcon: any, handleToggleMeta: any}) => {
+  const {msg, friendlyTime, level, data, meta, timestamp, id, showMeta} = item
+  return (
+    <li key={id} className="log-item">
+    <div className="min-h-12 w-full flex flex-col p-1" style={{ backgroundColor: msg?.includes('[WARNING]') ? '#f5c1c1' : ''}}>
+      <div className="cursor-pointer" onClick={() => handleToggleMeta(id)}>
+        <div className="h-10 flex items-center w-full">
+          <div className={`mr-1 w-[20px] min-w-[20px] level-${level}`}>{levelIcon(level)}</div>
+          <div className="mr-2 text-lg font-thin min-w-[60px] w-[60px]">{friendlyTime}</div>
+          <div className={`mr-5 min-w-[150px] text-lg text-center rounded border py-1 px-2 overflow-hidden text-ellipsis ${showMeta ? 'break-words' : 'whitespace-nowrap w-[150px]' }`} style={{ backgroundColor: meta.username ? usernameColors[meta.username] + '40' : 'rgb(222,222,222)', borderColor: meta.username ? usernameColors[meta.username] + '80' : '' }}>{meta.username || ''}</div>
+          <div className={`text-xl font-medium text-gray-800 overflow-hidden text-ellipsis ${showMeta ? 'break-words' : 'whitespace-nowrap' }`}>{msg}</div>
+          <div className="ml-auto caret-icon">
+            {showMeta ? <CaretDown /> : <CaretLeft />}
+          </div>
+        </div>
+        <div style={{ display: data && Object.keys(data).length > 0 ? 'block' : 'none' }} className="text-xl p-2 font-medium">
+          <JSONPretty id="json-pretty" mainStyle="color: #1f2937" stringStyle="color: #1287c8" keyStyle="color: #1f2937" booleanStyle="color: #c812c0" valueStyle="color: #005aff;" data={data}></JSONPretty>
+        </div>
+      </div>
+    </div>
+    <div style={{ display: showMeta ? 'block' : 'none' }} className="text-xl p-4 font-medium relative">
+      <div className="absolute top-2 right-2">metadata</div>
+      <JSONPretty id="json-pretty" mainStyle="color: #1f2937" stringStyle="color: #0d7d70" keyStyle="color: #1f2937" booleanStyle="color: #c812c0" valueStyle="color: #005aff;" data={{...meta, timestamp, level}}></JSONPretty>
+    </div>
+  </li>
+  )
+});
+
+ListItem.displayName = 'ListItem';
+
 
 const MUTATION_OBSERVABLE_OPTIONS = {
   config: { attributes: false, childList: true, subtree: false },
