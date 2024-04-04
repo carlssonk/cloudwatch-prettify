@@ -7,6 +7,20 @@ const selector = {
   rows: '.awsui-table-row',
   timestamp: '.logs__log-events-table__timestamp-cell',
   json: '[data-testid=logs__log-events-table__message]',
+  search: '#logs__log-events-table__input > input',
+  dates: '.awsui-cw-date-time-range-popover-container p',
+  timezone: '.awsui_trigger_dwuol_18p6o_122'
+}
+
+const getSearchStr = () => {
+  const foundIframe = document.querySelector<HTMLIFrameElement>(selector.iframe)
+
+  const searchText = foundIframe.contentWindow.document.body.querySelector<HTMLInputElement>(selector.search)?.value || ''
+  const date = foundIframe.contentWindow.document.body.querySelectorAll(selector.dates) || []
+  const dateText = date?.[0]?.innerText || '' + date?.[1]?.innerText ||''
+  const timezoneText = foundIframe.contentWindow.document.body.querySelector<HTMLSpanElement>(selector.timezone)?.innerText || ''
+  console.log(searchText + dateText + timezoneText)
+  return searchText + dateText + timezoneText
 }
 
 const getTable = () => {
@@ -52,4 +66,4 @@ const waitForAnchor = (): Promise<PlasmoCSUIAnchor> =>
     }, 100)
   })
 
-export { selector, getRowContainer, formatTwoDigits, stringToHex, waitForAnchor, getTable }
+export { selector, getRowContainer, formatTwoDigits, stringToHex, waitForAnchor, getTable, getSearchStr }

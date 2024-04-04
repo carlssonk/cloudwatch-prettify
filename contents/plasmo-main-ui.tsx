@@ -2,7 +2,7 @@ import type { PlasmoCSConfig, PlasmoGetStyle } from "plasmo"
 import { useCallback, useEffect, useState, memo } from "react"
 import overrideCss from "data-text:../override.css"
 import mainCss from "data-text:../main.css"
-import { formatTwoDigits, getRowContainer, getTable, selector, stringToHex, waitForAnchor } from "./utils"
+import { formatTwoDigits, getRowContainer, getTable, selector, stringToHex, waitForAnchor, getSearchStr } from "./utils"
 import { v4 as uuidv4 } from 'uuid';
 import InfoIcon from "react:~/assets/info-lg.svg"
 import WarnIcon from "react:~/assets/exclamation-triangle-fill.svg"
@@ -106,7 +106,8 @@ function PlasmoMainUI() {
   const [hasInited, setHasInited] = useState(false)
   const [store] = useState({
     prevLength: 0,
-    previousBatchFirstLogId: ''
+    previousBatchFirstLogId: '',
+    prevSearch: '',
   })
   const [usernameColors, setUsernameColors] = useState({})
 
@@ -115,11 +116,21 @@ function PlasmoMainUI() {
       const rowContainer = getRowContainer()
 
       if (rowContainer) {
+        // Check if search has changes since previous fetch
+        const currentSearch = getSearchStr()
+        const searchHasChanged = store.prevSearch !== currentSearch
+        if (searchHasChanged) {
+          store.prevLength = 0
+          setLogs([])
+        }
+
         const childNodesArray = [...rowContainer.childNodes]
 
         // 2 = skip the Load more/Resume row and skip this ui compoonent
         // childNodesArray.length - 1 = skip the Load more/Resume row
         const slicedChildNodesArray = childNodesArray.slice(2, childNodesArray.length - 1)
+        if (slicedChildNodesArray.length === 0) return
+        
 
         const newBatchFirstLogId = getLogId(slicedChildNodesArray[0])
         let left = 0;
@@ -174,23 +185,30 @@ function PlasmoMainUI() {
         getTable().insertAdjacentHTML('beforebegin', `<style>${overrideCss}</style>`)
 
         const previousBatchFirstLogId = store.previousBatchFirstLogId
-        setLogs(prevLogs => {
-          if (newBatchFirstLogId !== previousBatchFirstLogId) {
-            return [
-              ...newLogs,
-              ...(prevLogs ?? [])
-            ]
-          } else {
-            return [
-              ...(prevLogs ?? []),
-              ...newLogs
-            ]
-          }
-        })
+        if (searchHasChanged) {
+          setLogs(newLogs)
+        } else {
+          // If search has not changed, it means that this batch of logs comes from scrolling the list, so append/prepend logs instead of clearing previous logs.
+          setLogs(prevLogs => {
+            if (newBatchFirstLogId !== previousBatchFirstLogId) {
+              return [
+                ...newLogs,
+                ...(prevLogs ?? [])
+              ]
+            } else {
+              return [
+                ...(prevLogs ?? []),
+                ...newLogs
+              ]
+            }
+          })
+        }
+
         setUsernameColors(createUsernameColors)
 
         store.previousBatchFirstLogId = newBatchFirstLogId
         store.prevLength = slicedChildNodesArray.length
+        store.prevSearch = currentSearch
     }
   }, [])
 
