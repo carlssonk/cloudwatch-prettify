@@ -1,7 +1,7 @@
 {
   "name": "cloudwatch-prettify",
   "displayName": "CloudWatch Prettify",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "'Syntactic sugar' for CloudWatch logs",
   "author": "oliver",
   "packageManager": "yarn@1.22.19",
